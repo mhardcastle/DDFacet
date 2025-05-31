@@ -41,7 +41,14 @@ class ClassLOFARBeam():
 
     def InitLOFARBeam(self):
         GD=self.GD
-        LOFARBeamMode=GD["Beam"]["LOFARBeamMode"]
+
+        if "PhasedArrayMode" in GD["Beam"].keys():
+            LOFARBeamMode=GD["Beam"]["PhasedArrayMode"]
+        elif "LOFARBeamMode" in GD["Beam"].keys():
+            LOFARBeamMode=GD["Beam"]["LOFARBeamMode"]
+        else:
+            stop
+
         print("  LOFAR beam model in %s mode"%(LOFARBeamMode), file=log)
         useArrayFactor=("A" in LOFARBeamMode)
         useElementBeam=("E" in LOFARBeamMode)

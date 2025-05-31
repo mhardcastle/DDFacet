@@ -154,8 +154,9 @@ class ClassJones():
         # self.JonesNormSolsFile_killMS="%s/JonesNorm_killMS.npz"%ThisMSName
         # self.JonesNormSolsFile_Beam="%s/JonesNorm_Beam.npz"%ThisMSName
 
-    def InitDDESols(self, DATA, quiet=False):
+    def InitDDESols(self, DATA, quiet=False, RADEC_ForcedBeamDirs=None):
         GD = self.GD
+        self.RADEC_ForcedBeamDirs=RADEC_ForcedBeamDirs
         SolsFile = GD["DDESolutions"]["DDSols"]
         self.ApplyCal = False
         if SolsFile != "" and SolsFile is not None:
@@ -359,30 +360,80 @@ class ClassJones():
                     self.ClusterCatBeam.ra[:] = self.DicoClusterDirs_kMS["ra"]
                     self.ClusterCatBeam.dec[:] = self.DicoClusterDirs_kMS["dec"]
             else:
+                if self.HasKillMSSols and self.GD["Beam"]["At"] == "tessel":
+                    print("  Getting beam Jones directions from DDE solution tessels [%i directions]"%(self.DicoClusterDirs_kMS["ra"].size), file=log)
+                    DicoClusterDirs = self.DicoClusterDirs_kMS
+                    NDir = DicoClusterDirs["l"].size
+                    self.ClusterCatBeam = np.zeros(
+                        (NDir,),
+                        dtype=[('Name', '|S200'),
+                               ('ra', float),
+                               ('dec', float),
+                               ('SumI', float),
+                               ("Cluster", int),
+                               ("l", float),
+                               ("m", float),
+                               ("I", float)])
+                    self.ClusterCatBeam = self.ClusterCatBeam.view(np.recarray)
+                    self.ClusterCatBeam.I = self.DicoClusterDirs_kMS["I"]
+                    self.ClusterCatBeam.SumI = self.DicoClusterDirs_kMS["I"]
+                    self.ClusterCatBeam.ra[:] = self.DicoClusterDirs_kMS["ra"]
+                    self.ClusterCatBeam.dec[:] = self.DicoClusterDirs_kMS["dec"]
+                elif self.RADEC_ForcedBeamDirs is not None:
+                    RABeam,DECBeam=self.RADEC_ForcedBeamDirs
+                    lBeam,mBeam=self.MS.radec2lm_scalar(RABeam,DECBeam)
+                    print("  Getting beam Jones directions ForcedBeamDirs [%i directions]"%RABeam.size, file=log)
+                    NDir = RABeam.size
+                    self.ClusterCatBeam = np.zeros(
+                        (NDir,),
+                        dtype=[('Name', '|S200'),
+                               ('ra', float),
+                               ('dec', float),
+                               ('SumI', float),
+                               ("Cluster", int),
+                               ("l", float),
+                               ("m", float),
+                               ("I", float)])
+                    self.ClusterCatBeam = self.ClusterCatBeam.view(np.recarray)
+                    self.ClusterCatBeam.I[:] = 1
+                    self.ClusterCatBeam.SumI[:] = 1
+                    self.ClusterCatBeam.ra[:] = RABeam
+                    self.ClusterCatBeam.dec[:] = DECBeam
+                    self.ClusterCatBeam.l[:] = lBeam
+                    self.ClusterCatBeam.m[:] = mBeam
+                    DicoClusterDirs = {}
+                    DicoClusterDirs["ra"] = RABeam
+                    DicoClusterDirs["dec"] = DECBeam
+                    DicoClusterDirs["l"] = lBeam
+                    DicoClusterDirs["m"] = mBeam
+                    DicoClusterDirs["I"] = self.ClusterCatBeam.I
+                    DicoClusterDirs["Cluster"] = np.arange(RABeam.size)
+                else:
+                    print("  Has no DDE information taking single Jones directions from current phase center", file=log)
 
-                self.ClusterCatBeam = np.zeros(
-                    (1,),
-                    dtype=[('Name', '|S200'),
-                           ('ra', float),
-                           ('dec', float),
-                           ('SumI', float),
-                           ("Cluster", int),
-                           ("l", float),
-                           ("m", float),
-                           ("I", float)])
-                self.ClusterCatBeam = self.ClusterCatBeam.view(np.recarray)
-                self.ClusterCatBeam.I = 1
-                self.ClusterCatBeam.SumI = 1
-                self.ClusterCatBeam.ra[0] = self.MS.rac
-                self.ClusterCatBeam.dec[0] = self.MS.decc
-                DicoClusterDirs = {}
-                DicoClusterDirs["l"] = np.array([0.], np.float32)
-                DicoClusterDirs["m"] = np.array([0.], np.float32)
-                DicoClusterDirs["ra"] = self.MS.rac
-                DicoClusterDirs["dec"] = self.MS.decc
-                DicoClusterDirs["I"] = np.array([1.], np.float32)
-                DicoClusterDirs["Cluster"] = np.array([0], np.int32)
-
+                    self.ClusterCatBeam = np.zeros(
+                        (1,),
+                        dtype=[('Name', '|S200'),
+                               ('ra', float),
+                               ('dec', float),
+                               ('SumI', float),
+                               ("Cluster", int),
+                               ("l", float),
+                               ("m", float),
+                               ("I", float)])
+                    self.ClusterCatBeam = self.ClusterCatBeam.view(np.recarray)
+                    self.ClusterCatBeam.I[:] = 1
+                    self.ClusterCatBeam.SumI[:] = 1
+                    self.ClusterCatBeam.ra[0] = self.MS.rac
+                    self.ClusterCatBeam.dec[0] = self.MS.decc
+                    DicoClusterDirs = {}
+                    DicoClusterDirs["l"] = np.array([0.], np.float32)
+                    DicoClusterDirs["m"] = np.array([0.], np.float32)
+                    DicoClusterDirs["ra"] = np.array([self.MS.rac], np.float32)
+                    DicoClusterDirs["dec"] = np.array([self.MS.decc], np.float32)
+                    DicoClusterDirs["I"] = np.array([1.], np.float32)
+                    DicoClusterDirs["Cluster"] = np.array([0], np.int32)
+                    
             DicoClusterDirs_Beam = DicoClusterDirs
             DicoSols = self.GiveBeam(DATA["uniq_times"], quiet=quiet)
             print("  Build VisTime-to-Beam mapping", file=log)

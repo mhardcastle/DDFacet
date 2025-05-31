@@ -38,6 +38,12 @@ def dict_to_shm(name, D):
         Ds[key]=D[key]
     return Ds
 
+def delDict(Name):
+    D=attach(Name)
+    if D is not None:
+        #print("DDDDDDDDDDDDDD")
+        D.delete()
+        os.system("rm -fr %s" % D.path)
 
 class SharedDictRepresentation(object):
     def __init__(self, path, readwrite, load):
