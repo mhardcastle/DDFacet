@@ -757,10 +757,16 @@ class ClassJones():
                     val[_soltab.weight == 0] = np.nan # set flagged data to nan
                     # check axes order and reshape
                     axes_order = _soltab.val.attrs['AXES'].decode().split(',')
-                    if 'freq' in axes_order: # phase, amplitude
-                        val = reorderAxes(val, axes_order, ['dir', 'ant', 'freq', 'time', 'pol'])
-                    else: # tec
-                        val = reorderAxes(val, axes_order, ['dir', 'ant', 'time', 'pol'])
+                    print(' Axes of soltab are',axes_order,file=log)
+                    required_order=['dir', 'ant', 'freq', 'time', 'pol']
+                    nopol=False
+                    if 'pol' not in axes_order:
+                        nopol=True
+                        required_order.remove('pol')
+                    if 'freq' not in axes_order: # TEC
+                        required_order.remove('freq')
+                    
+                    val = reorderAxes(val, axes_order, required_order)
                     val = val[...,t_h5_startidx:t_h5_stopidx,:] # select only time range also in MS
                     # times = _soltab.time[:]
 
@@ -786,8 +792,12 @@ class ClassJones():
                         phase = interp1d(_freqs, val, axis=2, kind='nearest', bounds_error=False,
                                     fill_value='extrapolate')(freqs) # linear?
                         # Nt, Nd, Na, Nf, Np
-                        phase = phase.transpose((3, 0, 1, 2, 4))
-                        gains *= np.exp(1j * phase)
+                        if nopol:
+                            phase = phase.transpose((3, 0, 1, 2))
+                            gains *= np.exp(1j * phase)[..., np.newaxis]
+                        else:
+                            phase = phase.transpose((3, 0, 1, 2, 4))
+                            gains *= np.exp(1j * phase)
                     if soltab == 'amplitude000':
                         val = val[dir_idx][:,ant_idx]
                         _freqs = np.array(_soltab.freq, np.float32)
@@ -829,7 +839,7 @@ class ClassJones():
         DicoSols["t0"] = np.insert(t_mid, 0, times[0]-diff[0])
         DicoSols["t1"] = np.append(t_mid, times[-1]+diff[-1])
         DicoSols["tm"] = times
-
+        DicoSols["StationNames"]=antnames_soltab
         Nt, Nd, Na, Nf, Np = gains.shape
 
         G = np.zeros((Nt, Nd, Na, Nf, 2, 2), np.complex64)
